@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Compiler Optimization Viewer — GCC vs LLVM</title>
+  <link rel="stylesheet" href="style.css"/>
+  <!-- highlight.js for syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- marked.js for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+<!-- ======================== SIDEBAR ======================== -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">⚙</div>
+    <div>
+      <div class="sidebar-title">Compiler Optimizer</div>
+      <div class="sidebar-sub">GCC vs LLVM/Clang</div>
+    </div>
+  </div>
+
+  <div class="sidebar-search">
+    <input type="text" id="search-input" placeholder="Search topics…" autocomplete="off"/>
+    <span class="search-icon">🔍</span>
+  </div>
+
+  <nav class="sidebar-nav" id="sidebar-nav">
+    <!-- populated by JS -->
+  </nav>
+
+  <div class="sidebar-footer">
+    <span id="topic-count"></span> Optimization Techniques
+  </div>
+</aside>
+
+<!-- ======================== MAIN ======================== -->
+<main class="main">
+
+  <!-- Welcome / splash -->
+  <div class="welcome" id="welcome">
+    <div class="welcome-icon">⚙</div>
+    <h1>Compiler Optimization Viewer</h1>
+    <p>Compare how <strong>GCC</strong> (x86-64 Assembly) and <strong>LLVM/Clang</strong> (LLVM IR) transform
+       the same C source code across four optimization levels.</p>
+    <div class="welcome-levels">
+      <span class="badge O0">-O0</span>
+      <span class="badge O1">-O1</span>
+      <span class="badge O2">-O2</span>
+      <span class="badge O3">-O3</span>
+    </div>
+    <p class="welcome-hint">Select a topic from the sidebar to get started.</p>
+    <div class="welcome-grid" id="welcome-grid">
+      <!-- cards populated by JS -->
+    </div>
+  </div>
+
+  <!-- Topic view (hidden until a topic is selected) -->
+  <div class="topic-view" id="topic-view" style="display:none">
+
+    <!-- Topic header -->
+    <div class="topic-header" id="topic-header">
+      <button class="back-btn" id="back-btn" title="Back to overview">← Back</button>
+      <div>
+        <h2 class="topic-title" id="topic-title"></h2>
+        <p class="topic-desc" id="topic-desc"></p>
+      </div>
+    </div>
+
+    <!-- Source code panel (collapsible) -->
+    <div class="panel source-panel">
+      <div class="panel-header" id="source-toggle">
+        <span class="panel-icon">📄</span>
+        <span>Source Code (C)</span>
+        <span class="toggle-arrow" id="source-arrow">▼</span>
+      </div>
+      <div class="panel-body" id="source-body">
+        <div class="source-files" id="source-files">
+          <!-- source tabs: GCC src / LLVM src -->
+        </div>
+        <pre class="code-block" id="source-code"><code id="source-code-inner" class="language-c">Loading…</code></pre>
+      </div>
+    </div>
+
+    <!-- Optimization level tabs -->
+    <div class="opt-tabs-header">
+      <span class="opt-tabs-label">Optimization Level:</span>
+      <div class="opt-tabs" id="opt-tabs">
+        <button class="opt-tab active" data-level="O0">-O0 <span class="tab-desc">None</span></button>
+        <button class="opt-tab"        data-level="O1">-O1 <span class="tab-desc">Basic</span></button>
+        <button class="opt-tab"        data-level="O2">-O2 <span class="tab-desc">More</span></button>
+        <button class="opt-tab"        data-level="O3">-O3 <span class="tab-desc">Aggressive</span></button>
+      </div>
+    </div>
+
+    <!-- Compiler output panels -->
+    <div class="compiler-grid">
+
+      <!-- GCC panel -->
+      <div class="compiler-panel gcc-panel">
+        <div class="compiler-header gcc-header">
+          <span class="compiler-badge gcc-badge">GCC</span>
+          <span>x86-64 Assembly</span>
+          <span class="file-tag" id="gcc-file-tag"></span>
+          <button class="copy-btn" id="gcc-copy-btn" title="Copy to clipboard">⎘</button>
+        </div>
+        <div class="code-wrap" id="gcc-code-wrap">
+          <pre class="code-block"><code id="gcc-code" class="language-x86asm">Select a topic and level.</code></pre>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="compiler-divider">VS</div>
+
+      <!-- LLVM panel -->
+      <div class="compiler-panel llvm-panel">
+        <div class="compiler-header llvm-header">
+          <span class="compiler-badge llvm-badge">LLVM/Clang</span>
+          <span>LLVM IR</span>
+          <span class="file-tag" id="llvm-file-tag"></span>
+          <button class="copy-btn" id="llvm-copy-btn" title="Copy to clipboard">⎘</button>
+        </div>
+        <div class="code-wrap" id="llvm-code-wrap">
+          <pre class="code-block"><code id="llvm-code" class="language-llvm">Select a topic and level.</code></pre>
+        </div>
+      </div>
+
+    </div><!-- /compiler-grid -->
+
+    <!-- Explanation panel -->
+    <div class="panel explanation-panel" id="explanation-panel">
+      <div class="panel-header" id="explanation-toggle">
+        <span class="panel-icon">📖</span>
+        <span>Explanation</span>
+        <div class="exp-tabs" id="exp-tabs">
+          <button class="exp-tab active" data-exp="gcc">GCC Notes</button>
+          <button class="exp-tab" data-exp="llvm">LLVM Notes</button>
+          <button class="exp-tab" data-exp="diff">Key Differences</button>
+        </div>
+        <span class="toggle-arrow" id="exp-arrow">▼</span>
+      </div>
+      <div class="panel-body" id="exp-body">
+        <div class="exp-content" id="exp-content">Loading explanation…</div>
+      </div>
+    </div>
+
+  </div><!-- /topic-view -->
+
+  <!-- Loading spinner -->
+  <div class="loading-overlay" id="loading-overlay" style="display:none">
+    <div class="spinner"></div>
+    <p>Loading…</p>
+  </div>
+
+</main>
+
+<!-- ======================== SCRIPTS ======================== -->
+<script src="app.js"></script>
+</body>
+</html>
