@@ -1,0 +1,104 @@
+====================================================
+  LLVM OPTIMIZATION: Constant Folding
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Constant_Folding
+COMPILE COMMAND: clang -O1 -S -emit-llvm -o const_fold.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS CONSTANT FOLDING?
+----------------------------------------------------
+Constant Folding is a compiler optimization where expressions that involve
+ONLY CONSTANT VALUES (i.e., values known at compile time) are evaluated
+by the COMPILER ITSELF — before the program even runs.
+
+Instead of generating machine instructions to calculate "3 + 4" at runtime,
+the compiler simply replaces the entire expression with the RESULT (7).
+
+This means NO arithmetic operations happen at runtime — the values are
+already baked into the compiled binary.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int a = 3 + 4;          // folded to 7
+
+  3 and 4 are both compile-time constants.
+  LLVM computes: 3 + 4 = 7 at compile time.
+  In the binary, 'a' is simply stored as 7.
+  No addition instruction is generated.
+
+    int b = 2 * 8;          // folded to 16
+
+  2 and 8 are both compile-time constants.
+  LLVM computes: 2 * 8 = 16 at compile time.
+  'b' is stored as 16. No multiplication instruction generated.
+
+    int c = 100 / 5;        // folded to 20
+
+  100 and 5 are both compile-time constants.
+  LLVM computes: 100 / 5 = 20 at compile time.
+  'c' is stored as 20. No division instruction generated.
+
+    int d = a + b + c;      // further folded to 43
+
+  Since a=7, b=16, c=20 are all known constants (already folded),
+  LLVM further folds: 7 + 16 + 20 = 43 at compile time.
+  'd' is stored as 43. No addition at runtime.
+
+    return d;
+
+  Returns the constant 43.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Constant Folding (unoptimized):
+  The program would generate instructions at RUNTIME:
+    ADD  3, 4  -> a = 7
+    MUL  2, 8  -> b = 16
+    DIV 100, 5 -> c = 20
+    ADD  a, b  -> 23
+    ADD  23, c -> d = 43
+
+With Constant Folding (LLVM -O1):
+  ALL computations are done at COMPILE TIME.
+  The generated IR/binary would essentially be:
+    return 43;
+  (A single instruction returning the pre-computed value!)
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O1 -S -emit-llvm -o const_fold.ll example_1_1.c
+
+Then open const_fold.ll and observe:
+  - You will see NO add, mul, or div instructions.
+  - Instead, you'll see something like:  ret i32 43
+  - The entire function body is replaced with a single return of 43.
+
+Compare with no optimization:
+  clang -O0 -S -emit-llvm -o const_fold_noopt.ll example_1_1.c
+  - Here you WILL see the arithmetic instructions.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  d = 7 + 16 + 20 = 43
+  The program returns 43.
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Constant Folding eliminates runtime arithmetic on known constants.
+  - It makes programs faster since the CPU doesn't need to execute
+    those compute instructions — the answer is already there.
+  - LLVM applies constant folding even at -O1 (the lowest optimization level).
+  - It also works across chains of constants (like 'd' depends on a, b, c
+    which are ALL constants — so d is folded too).
+  - This is one of the simplest but most powerful optimizations.
+====================================================

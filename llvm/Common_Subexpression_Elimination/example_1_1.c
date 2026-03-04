@@ -2,8 +2,6 @@
 // LLVM eliminates repeated computation of (a * b + c)
 // Compile: clang -O2 -S -emit-llvm -o cse.ll example_1_1.c
 
-#include <stdio.h>
-
 int main() {
     int a = 4, b = 5, c = 3;
 
@@ -13,6 +11,5 @@ int main() {
 
     int z = x + y;       // uses both results
 
-    printf("x = %d, y = %d, z = %d\n", x, y, z);
-    return 0;
+    return z;
 }

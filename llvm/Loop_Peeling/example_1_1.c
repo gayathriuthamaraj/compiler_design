@@ -2,8 +2,6 @@
 // LLVM peels the first (or last) few iterations to handle boundary conditions
 // Compile: clang -O3 -S -emit-llvm -o loop_peel.ll example_1_1.c
 
-#include <stdio.h>
-
 int main() {
     int arr[8] = {0};
 
@@ -17,6 +15,5 @@ int main() {
         }
     }
 
-    printf("arr[5] = %d\n", arr[5]);  // 0+1+2+3+4+5 = 15
-    return 0;
+    return arr[5];  // returns 0+1+2+3+4+5 = 15
 }

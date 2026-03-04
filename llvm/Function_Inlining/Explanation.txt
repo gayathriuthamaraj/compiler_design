@@ -1,0 +1,132 @@
+====================================================
+  LLVM OPTIMIZATION: Function Inlining
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Function_Inlining
+COMPILE COMMAND: clang -O2 -S -emit-llvm -o func_inline.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS FUNCTION INLINING?
+----------------------------------------------------
+Function Inlining is a compiler optimization where the COMPILER REPLACES
+A FUNCTION CALL with the ACTUAL BODY of the function, directly at the
+call site.
+
+Instead of:
+  1. Pushing arguments onto the stack
+  2. Jumping to the function
+  3. Executing the function body
+  4. Returning to the caller
+  5. Reading the return value
+
+LLVM simply PASTES the function's code directly where the call appears,
+eliminating ALL function call overhead.
+
+This is especially beneficial for SMALL functions called frequently.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+THE FUNCTION:
+  static inline int square(int x) {
+      return x * x;
+  }
+
+  'square' is a tiny function that returns x * x.
+  The 'static inline' keyword is a HINT to the compiler to inline this function.
+  However, LLVM makes its own decision based on profitability.
+
+  'static'  -> function is local to this file (not exported)
+  'inline'  -> programmer's hint to inline (LLVM may or may not follow it)
+
+THE CALL:
+  int a = 6;
+  int result = square(a);
+
+  Without inlining: At runtime, 'square' would be called as a function.
+    - Push a=6 onto stack
+    - Call square()
+    - Execute: return 6 * 6 = 36
+    - Pop return value
+    - Store in result
+
+  With inlining: LLVM replaces the call with the body directly:
+    result = a * a   (= 6 * 6 = 36)
+    No function call happens at all!
+
+  Further (with constant values): since a=6 is a constant,
+  LLVM also constant-folds: result = 36
+
+    return result;
+
+  Returns 36.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Inlining (unoptimized / large functions):
+  CALL square(a)
+    PUSH a onto stack
+    JUMP to square
+    COMPUTE x * x (where x = a = 6)
+    RETURN 36
+    POP return value
+  result = 36
+  RETURN result
+
+With Function Inlining (LLVM -O2):
+  The function body is SUBSTITUTED at the call site:
+    result = a * a   --> result = 6 * 6 --> result = 36
+  Then constant folding kicks in:
+    result = 36 (directly)
+  Return 36
+
+  Final IR is likely just:  ret i32 36
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O2 -S -emit-llvm -o func_inline.ll example_1_1.c
+
+Then open func_inline.ll and observe:
+  - The function 'square' will likely NOT appear as a separate function.
+  - The multiplication (or the folded constant 36) will appear directly
+    inside main().
+  - At -O2, the entire main() likely becomes: ret i32 36
+
+Compare with:
+  clang -O0 -S -emit-llvm -o func_inline_noopt.ll example_1_1.c
+  - Here you'll see: call i32 @square(i32 6)
+    A proper function call with argument passing.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  a = 6
+  result = square(6) = 6 * 6 = 36
+  The program returns 36.
+
+----------------------------------------------------
+WHEN DOES LLVM INLINE A FUNCTION?
+----------------------------------------------------
+LLVM uses a COST MODEL to decide whether to inline:
+  - Small functions (few instructions) -> inlined aggressively
+  - Large functions -> NOT inlined (inlining would increase code size too much)
+  - Recursive functions -> generally NOT inlined
+  - Functions marked 'inline' or 'always_inline' -> strong hints to inline
+
+At -O2 and -O3, inlining is very aggressive.
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Function Inlining eliminates function call overhead.
+  - Makes small utility functions (like square, abs, min, max) zero-cost.
+  - Enables further optimizations (like constant folding) INSIDE the inlined body.
+  - Trade-off: more inlining = faster code but LARGER binary size.
+  - LLVM balances this automatically based on the optimization level.
+====================================================

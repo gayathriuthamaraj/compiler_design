@@ -1,0 +1,129 @@
+====================================================
+  LLVM OPTIMIZATION: Strength Reduction in Loops
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Strength_Reduction_in_Loops
+COMPILE COMMAND: clang -O2 -S -emit-llvm -o sr_loops.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS STRENGTH REDUCTION IN LOOPS?
+----------------------------------------------------
+Strength Reduction in Loops is a specialized form of Strength Reduction
+applied INSIDE LOOP BODIES where the expensive operation uses the loop
+induction variable (like i).
+
+When you compute "i * constant" inside a loop, a new MULTIPLICATION happens
+on every iteration. Since 'i' changes by a fixed step (+1 each time),
+the result "i * constant" also changes by a fixed step (+ constant each time).
+
+LLVM replaces the multiplication with a running accumulator variable that
+simply ADDS the constant each iteration — turning O(n) multiplications
+into O(n) additions.
+
+Additions are 3-5x faster than multiplications.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int arr[10];
+
+  Array of 10 integers.
+
+    for (int i = 0; i < 10; i++) {
+        arr[i] = i * 5;   // i*5 replaced by: t=0; t+=5 each iteration
+    }
+
+  Each iteration computes i * 5:
+    i=0: arr[0] = 0*5 = 0
+    i=1: arr[1] = 1*5 = 5
+    i=2: arr[2] = 2*5 = 10
+    i=3: arr[3] = 3*5 = 15
+    i=4: arr[4] = 4*5 = 20
+    ...
+    i=9: arr[9] = 9*5 = 45
+
+  Without optimization: "i * 5" (MUL) runs 10 times.
+
+  With Strength Reduction:
+    LLVM introduces a new variable 't' starting at 0,
+    and increments it by 5 on each iteration instead of multiplying:
+
+    t = 0
+    for (int i = 0; i < 10; i++) {
+        arr[i] = t;     // use t directly instead of i*5
+        t += 5;         // ADD 5 each time instead of MUL
+    }
+
+  Result is IDENTICAL but 10 MULs are replaced by 10 ADDs.
+
+    return arr[4] + arr[9];  // 20 + 45 = 65
+
+  Returns 65.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Strength Reduction (unoptimized):
+  t = 0
+  Loop 10 times:
+    arr[i] = MUL(i, 5)   <-- multiply on every iteration
+
+With Strength Reduction (LLVM -O2):
+  accumulator = 0
+  Loop 10 times:
+    arr[i] = accumulator
+    accumulator += 5     <-- add on every iteration (no multiply!)
+
+The multiplier (5) is used to determine the INCREMENT STEP once,
+and then only cheap additions run in the loop.
+
+----------------------------------------------------
+DIFFERENCE FROM PLAIN STRENGTH REDUCTION
+----------------------------------------------------
+  Plain Strength Reduction (Strength_Reduction folder):
+    Works on SINGLE expressions outside/inside a loop:
+    int a = x * 8  ->  int a = x << 3
+    (Works for power-of-2 multipliers only)
+
+  Strength Reduction in Loops (this example):
+    Works on expressions where the multiplier is ANY CONSTANT and the
+    multiplicand is the LOOP INDUCTION VARIABLE.
+    int arr[i] = i * 5  ->  accumulator += 5 each step
+    (Works for ANY constant multiplier, not just powers-of-2)
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O2 -S -emit-llvm -o sr_loops.ll example_1_1.c
+
+Then open sr_loops.ll and observe:
+  - Inside the loop: look for 'add' instead of 'mul'.
+  - The loop induction variable might be a step-5 accumulator
+    instead of i * 5.
+
+Compare with:
+  clang -O0 -S -emit-llvm -o sr_loops_noopt.ll example_1_1.c
+  - Here: mul i32 %i, 5 will appear inside the loop.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  arr = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45]
+  arr[4] = 20
+  arr[9] = 45
+  return 20 + 45 = 65
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Strength Reduction in Loops eliminates per-iteration multiplications.
+  - Replaces i * constant with an incrementing accumulator (t += constant).
+  - Very impactful in tight loops — loops that run thousands of iterations.
+  - Works for ANY constant factor, not just powers of 2.
+  - LLVM's SCEV (Scalar Evolution) analysis drives this optimization.
+  - Commonly seen in array index calculations, DSP, rendering loops.
+====================================================

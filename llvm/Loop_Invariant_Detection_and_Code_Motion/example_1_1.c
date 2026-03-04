@@ -2,8 +2,6 @@
 // LLVM moves computations that don't change inside the loop to outside the loop
 // Compile: clang -O2 -S -emit-llvm -o licm.ll example_1_1.c
 
-#include <stdio.h>
-
 int main() {
     int arr[100];
     int factor = 7;
@@ -15,6 +13,5 @@ int main() {
         arr[i] = i + factor * scale;   // factor * scale hoisted out
     }
 
-    printf("arr[10] = %d\n", arr[10]);  // 10 + 21 = 31
-    return 0;
+    return arr[10];  // returns 10 + 21 = 31
 }

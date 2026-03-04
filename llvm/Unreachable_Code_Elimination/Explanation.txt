@@ -1,0 +1,152 @@
+====================================================
+  LLVM OPTIMIZATION: Unreachable Code Elimination
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Unreachable_Code_Elimination
+COMPILE COMMAND: clang -O1 -S -emit-llvm -o unreachable.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS UNREACHABLE CODE ELIMINATION?
+----------------------------------------------------
+Unreachable Code Elimination is a compiler optimization where LLVM detects
+and REMOVES code that can NEVER BE EXECUTED under any circumstances.
+
+Code is "unreachable" if:
+  1. It appears AFTER A RETURN STATEMENT in a function.
+     (Once you return, nothing after it runs.)
+  2. It is inside a CONDITIONAL BRANCH whose condition is ALWAYS TRUE or FALSE.
+     (The branch that "always loses" is dead/unreachable.)
+  3. It is in a path that is LOGICALLY IMPOSSIBLE given known variable values.
+
+LLVM performs this analysis statically (at compile time) and removes the
+dead basic blocks and instructions entirely from the compiled output.
+This makes the binary smaller and faster.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+FUNCTION: getValue()
+  int getValue() {
+      return 42;
+      // Everything below is unreachable — LLVM removes it entirely
+      return -1;  // unreachable dead return
+  }
+
+  The function returns 42 immediately on the FIRST line.
+  The second "return -1" can NEVER BE REACHED — it is after a return.
+  LLVM sees this and REMOVES "return -1" entirely from the compiled output.
+
+  -> getValue() always returns 42. The second return is dead code eliminated.
+
+FUNCTION: main()
+    int x = 1;
+    int result = 0;
+
+  x is assigned 1. It is NEVER CHANGED after this.
+
+    if (x > 0) {
+        result = 1;   // always taken — x=1 is always > 0
+    } else {
+        result = -1;  // unreachable — eliminated by LLVM
+    }
+
+  LLVM performs CONSTANT PROPAGATION: x = 1 is a known constant.
+  The condition "x > 0" → "1 > 0" → ALWAYS TRUE (at compile time!).
+
+  Therefore:
+    - The "if" branch (result = 1) is ALWAYS taken.
+    - The "else" branch (result = -1) is NEVER taken — it is UNREACHABLE.
+
+  LLVM ELIMINATES the entire else block. The if-else becomes:
+    result = 1;   // just this, no branch needed!
+
+    int v = getValue();
+    return v + result;  // 42 + 1 = 43
+
+  v = 42 (from getValue())
+  result = 1 (always taken branch)
+  Returns 43.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Unreachable Code Elimination (unoptimized):
+  getValue():
+    return 42
+    [return -1 — still in binary even though unreachable]
+
+  main():
+    x = 1
+    if (x > 0):
+      result = 1
+    else:
+      result = -1   [compiled even though never executed]
+    v = call getValue()
+    return v + result
+
+With Unreachable Code Elimination (LLVM -O1):
+  getValue():
+    return 42       <- only this remains
+
+  main():
+    result = 1      <- branch eliminated, always-true path kept
+    v = 42          <- getValue() may be inlined too
+    return 43       <- fully constant-folded
+
+All dead/unreachable code is GONE from the binary.
+
+----------------------------------------------------
+TWO TYPES OF UNREACHABLE CODE IN THIS EXAMPLE
+----------------------------------------------------
+
+TYPE 1: Post-return code (in getValue)
+  Code after a "return" statement.
+  Example: the "return -1" after "return 42".
+  LLVM trivially detects this during parsing.
+
+TYPE 2: Infeasible branch (in main)
+  A branch condition that is ALWAYS TRUE or ALWAYS FALSE due to
+  known constant values.
+  Example: "if (x > 0)" where x=1 is always > 0.
+  LLVM uses constant propagation to evaluate the condition at compile time.
+  The false branch becomes "unreachable" and is eliminated.
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O1 -S -emit-llvm -o unreachable.ll example_1_1.c
+
+Then open unreachable.ll and observe:
+  - In getValue(): only "ret i32 42" present. No second return.
+  - In main(): the else block (result = -1) is ABSENT.
+    The conditional branch may be entirely removed.
+  - Likely the final IR is just: ret i32 43
+
+Compare with:
+  clang -O0 -S -emit-llvm -o unreachable_noopt.ll example_1_1.c
+  - Here: both branches of if-else appear in the IR.
+  - The "return -1" in getValue() appears as a separate basic block.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  getValue() returns 42.
+  x = 1, condition x > 0 is always true -> result = 1.
+  return v + result = 42 + 1 = 43.
+  The program returns 43.
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Unreachable Code Elimination makes binaries leaner and faster.
+  - Two main sources: post-return code, and always-false branches.
+  - Works hand-in-hand with Constant Propagation (constants enable
+    compiler to evaluate conditions statically).
+  - LLVM represents unreachable code explicitly with the "unreachable"
+    instruction in its IR before completely removing those blocks.
+  - Even -O1 aggressively removes unreachable code.
+====================================================

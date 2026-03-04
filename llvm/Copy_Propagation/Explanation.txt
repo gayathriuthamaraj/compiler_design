@@ -1,0 +1,124 @@
+====================================================
+  LLVM OPTIMIZATION: Copy Propagation
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Copy_Propagation
+COMPILE COMMAND: clang -O1 -S -emit-llvm -o copy_prop.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS COPY PROPAGATION?
+----------------------------------------------------
+Copy Propagation is a compiler optimization where a COPY of a variable
+(i.e., an assignment like "b = a") is REPLACED by the ORIGINAL variable
+everywhere the copy is used.
+
+When you write: int b = a;
+  - 'b' is just a "copy" of 'a'.
+  - Instead of reading 'b', the compiler directly uses 'a' wherever 'b' was referenced.
+  - The intermediate copy variable ('b') can then be ELIMINATED.
+
+This reduces unnecessary variable storage and memory operations.
+Copy Propagation often enables DEAD CODE ELIMINATION as a follow-on optimization
+(the copy variables become dead after propagation).
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int a = 42;
+
+  'a' is assigned the value 42. This is the ORIGINAL variable.
+
+    int b = a;    // b is a copy of a
+
+  'b' copies the value of 'a'.
+  b == 42 (a copy of a).
+  LLVM notes: b = a  (b is just an alias for a right now)
+
+    int c = b;    // c is a copy of b (which is a copy of a)
+
+  'c' copies the value of 'b'.
+  c == 42 (a copy of b, which is a copy of a).
+  LLVM notes: c = b = a  (c is also an alias for a)
+
+  After 2-step propagation:
+    b -> a  (b replaced by a)
+    c -> b -> a  (c replaced by a directly)
+
+    int result = c + 8;   // c gets replaced by a directly
+
+  After copy propagation: c is replaced by a.
+  So this becomes: result = a + 8 = 42 + 8 = 50
+
+    return result;  // returns 50
+
+  Returns 50.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Copy Propagation (unoptimized):
+  Store a = 42
+  Load a -> temp
+  Store b = temp        (copy 1)
+  Load b -> temp2
+  Store c = temp2       (copy 2)
+  Load c -> temp3
+  ADD temp3, 8 -> result
+  Return result
+
+With Copy Propagation (LLVM -O1):
+  a = 42
+  b and c are recognized as unnecessary copies of a.
+  They are ELIMINATED. All references to b and c become references to a.
+  result = a + 8 = 42 + 8 = 50
+  Return 50
+
+  (Or even further: since a=42 is a constant, the whole thing collapses to: ret i32 50)
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O1 -S -emit-llvm -o copy_prop.ll example_1_1.c
+
+Then open copy_prop.ll and observe:
+  - At -O1: b and c variables will be ABSENT from the IR.
+  - 'a' is used directly or the entire chain is folded to return 50.
+  - No alloca, store, load for b or c.
+
+Compare with:
+  clang -O0 -S -emit-llvm -o copy_prop_noopt.ll example_1_1.c
+  - Here you'll see separate alloca/store/load for a, b, c.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  a = 42
+  b = a = 42  (copy, eliminated)
+  c = b = 42  (copy, eliminated)
+  result = c + 8 = 42 + 8 = 50
+  The program returns 50.
+
+----------------------------------------------------
+COPY PROPAGATION vs CONSTANT PROPAGATION
+----------------------------------------------------
+  Constant Propagation: propagates LITERAL VALUES (e.g., x = 10).
+  Copy Propagation:     propagates VARIABLE VALUES (e.g., b = a).
+
+  Copy Propagation works even when the value is NOT a constant —
+  it works as long as one variable is directly assigned from another
+  and neither changes in between.
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Copy Propagation removes intermediate "alias" variables.
+  - Reduces the number of load/store operations.
+  - Works hand-in-hand with Dead Code Elimination
+    (after propagation, the copy variables become unused and are then removed).
+  - LLVM uses SSA form which makes copy propagation trivially easy —
+    each variable is assigned only once, making copy chains obvious.
+====================================================

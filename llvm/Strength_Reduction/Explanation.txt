@@ -1,0 +1,114 @@
+====================================================
+  LLVM OPTIMIZATION: Strength Reduction
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Strength_Reduction
+COMPILE COMMAND: clang -O2 -S -emit-llvm -o strength_red.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS STRENGTH REDUCTION?
+----------------------------------------------------
+Strength Reduction is a compiler optimization where an EXPENSIVE operation
+is replaced by an EQUIVALENT but CHEAPER operation that produces the same result.
+
+Common replacements:
+  - Multiplication by power of 2  ->  Left Bit Shift  (x * 8  = x << 3)
+  - Division by power of 2        ->  Right Bit Shift  (x / 4  = x >> 2)
+  - Modulo by power of 2          ->  Bitwise AND       (x % 8  = x & 7)
+
+These work because numbers are stored in BINARY.
+Shifting bits left by N positions is the same as multiplying by 2^N.
+Shifting bits right by N positions is the same as dividing by 2^N.
+
+Bit shifts are single-cycle CPU instructions — MUCH faster than multiply/divide.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int x = 9;
+
+  x = 9. This is our base value.
+
+    int a = x * 8;
+
+  Mathematically: 9 * 8 = 72
+  8 = 2^3, so LLVM replaces this with: x << 3
+    9 in binary: 00001001
+    9 << 3:      01001000  = 72
+  Result: a = 72
+
+    int b = x * 4;
+
+  Mathematically: 9 * 4 = 36
+  4 = 2^2, so LLVM replaces this with: x << 2
+    9 in binary: 00001001
+    9 << 2:      00100100  = 36
+  Result: b = 36
+
+    return a + b;  // 72 + 36 = 108
+
+  Returns 108.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Strength Reduction:
+  a = x * 8    (MUL instruction)
+  b = x * 4    (MUL instruction)
+
+With Strength Reduction (LLVM -O2):
+  a = x << 3   (SHL — shift left by 3)
+  b = x << 2   (SHL — shift left by 2)
+
+On most CPUs:
+  MUL takes 3-5 clock cycles
+  SHL takes 1 clock cycle
+So strength reduction provides 3-5x speedup for each multiplication.
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O2 -S -emit-llvm -o strength_red.ll example_1_1.c
+
+Then open strength_red.ll and observe:
+  - Look for 'shl' instructions (shift left) instead of 'mul'.
+  - "x * 8"  becomes "shl i32 %x, 3"
+  - "x * 4"  becomes "shl i32 %x, 2"
+
+Compare with:
+  clang -O0 -S -emit-llvm -o strength_red_noopt.ll example_1_1.c
+  - Here you'll see: mul i32 %x, 8  and  mul i32 %x, 4
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  a = 9 * 8 = 72   (computed as 9 << 3)
+  b = 9 * 4 = 36   (computed as 9 << 2)
+  return a + b = 72 + 36 = 108
+
+----------------------------------------------------
+POWER-OF-2 TABLE (for reference)
+----------------------------------------------------
+  x * 1   = x << 0
+  x * 2   = x << 1
+  x * 4   = x << 2
+  x * 8   = x << 3
+  x * 16  = x << 4
+  x * 32  = x << 5
+  x / 2   = x >> 1
+  x / 4   = x >> 2
+  x / 8   = x >> 3
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Strength Reduction replaces slow operations with faster equivalents.
+  - Multiplications/divisions by powers-of-2 become bit shifts.
+  - Bit shifts execute in 1 CPU clock cycle vs 3-5 for multiply.
+  - LLVM applies this even at -O1.
+  - Crucial for performance-critical inner loops in embedded, audio, graphics.
+====================================================

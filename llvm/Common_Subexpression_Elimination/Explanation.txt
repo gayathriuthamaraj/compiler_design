@@ -1,0 +1,104 @@
+====================================================
+  LLVM OPTIMIZATION: Common Subexpression Elimination (CSE)
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Common_Subexpression_Elimination
+COMPILE COMMAND: clang -O2 -S -emit-llvm -o cse.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS COMMON SUBEXPRESSION ELIMINATION (CSE)?
+----------------------------------------------------
+Common Subexpression Elimination (CSE) is a compiler optimization technique
+where the compiler identifies expressions that are computed MORE THAN ONCE
+with the same result (i.e., they are "common" — their operands haven't changed),
+and REPLACES the duplicate computations with a single computation.
+
+The result is computed ONCE and REUSED wherever it is needed, instead of
+being calculated again from scratch.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int a = 4, b = 5, c = 3;
+
+  Three integer variables are initialized:
+    a = 4, b = 5, c = 3
+
+    int x = a * b + c;   // first occurrence
+
+  x = (4 * 5) + 3 = 20 + 3 = 23
+  This is the FIRST TIME the expression (a * b + c) is computed.
+
+    int y = a * b + c;   // redundant — CSE replaces this with x
+
+  y = (4 * 5) + 3 = 23
+  This is the SECOND TIME the SAME expression (a * b + c) is computed.
+  Since 'a', 'b', and 'c' have NOT changed between x and y,
+  this computation is REDUNDANT.
+
+  --> LLVM detects this redundancy and REPLACES the second computation
+      with a direct reference to the already-computed result of x.
+      So internally: y = x  (no recalculation!)
+
+    int z = x + y;
+
+  z = 23 + 23 = 46
+  This uses both x and y (which are the same value after CSE).
+
+    return z;
+
+  Returns 46.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without CSE (unoptimized):
+  t1 = a * b        --> 4 * 5 = 20
+  x  = t1 + c       --> 20 + 3 = 23
+  t2 = a * b        --> 4 * 5 = 20   (REDUNDANT!)
+  y  = t2 + c       --> 20 + 3 = 23  (REDUNDANT!)
+  z  = x + y        --> 23 + 23 = 46
+
+With CSE (optimized by LLVM -O2):
+  t1 = a * b        --> 4 * 5 = 20   (computed ONCE)
+  x  = t1 + c       --> 20 + 3 = 23  (computed ONCE)
+  y  = x            --> REUSED! (no recomputation)
+  z  = x + y        --> 23 + 23 = 46
+
+Result: 2 arithmetic operations ELIMINATED.
+The IR (.ll file) will show that x and y map to the same SSA value.
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O2 -S -emit-llvm -o cse.ll example_1_1.c
+
+Then open cse.ll and observe:
+  - At -O0 (no optimization): you will see TWO multiply and TWO add instructions.
+  - At -O2 (with CSE): you will see only ONE multiply and ONE add instruction.
+    The result is reused for both x and y.
+
+Compare also with:
+  clang -O0 -S -emit-llvm -o cse_no_opt.ll example_1_1.c
+to clearly see the difference.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  z = x + y = 23 + 23 = 46
+  The program returns 46.
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - CSE reduces redundant computation.
+  - It saves CPU cycles by not recalculating already-known values.
+  - LLVM uses SSA (Static Single Assignment) form to easily detect
+    when two expressions are identical and safely reuse results.
+  - This optimization is safe as long as the operands (a, b, c)
+    are not modified between the two uses.
+====================================================

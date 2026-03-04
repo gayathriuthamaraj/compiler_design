@@ -1,0 +1,130 @@
+====================================================
+  LLVM OPTIMIZATION: Induction Variable Elimination
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Induction_Variable_Elimination
+COMPILE COMMAND: clang -O2 -S -emit-llvm -o iv_elim.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS AN INDUCTION VARIABLE?
+----------------------------------------------------
+In a loop, a variable that changes by a FIXED AMOUNT on EVERY ITERATION
+is called an INDUCTION VARIABLE.
+
+Examples:
+  - The loop counter 'i' in "for (int i = 0; i < n; i++)" is a basic induction variable.
+    i increases by 1 each iteration.
+
+  - A variable 'j' defined as "j = i * 3" inside the loop is a DERIVED
+    induction variable (also called a linear function of i).
+    j takes values: 0, 3, 6, 9, 12, ...  (increases by 3 each iteration)
+
+----------------------------------------------------
+WHAT IS INDUCTION VARIABLE ELIMINATION?
+----------------------------------------------------
+When a derived induction variable (like j = i * 3) is computed using a
+MULTIPLICATION inside the loop, LLVM can:
+
+  1. Replace the multiplication with a CHEAPER INCREMENT:
+     Instead of: j = i * 3   (1 multiply per iteration)
+     LLVM uses:  j starts at 0, j += 3 each iteration  (1 add per iteration)
+     Addition is FASTER than multiplication on most hardware.
+
+  2. If the derived variable 'j' can be expressed purely as an increment
+     and the original loop counter 'i' is NO LONGER NEEDED for anything else,
+     LLVM may ELIMINATE 'i' entirely and keep only 'j'.
+
+This is called "Strength Reduction on Induction Variables" or
+"Induction Variable Elimination."
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int arr[10];
+    int n = 10;
+
+  Array of 10 integers. Loop will run 10 times.
+
+    for (int i = 0; i < n; i++) {
+        int j = i * 3;   // induction variable derived from i
+        arr[i] = j;
+    }
+
+  Each iteration:
+    i=0: j = 0*3 = 0,  arr[0] = 0
+    i=1: j = 1*3 = 3,  arr[1] = 3
+    i=2: j = 2*3 = 6,  arr[2] = 6
+    i=3: j = 3*3 = 9,  arr[3] = 9
+    ...
+
+  'j' is a derived induction variable (linear function of i: j = 3*i).
+  Without optimization: "i * 3" (a multiply) executes EVERY iteration.
+  With optimization: LLVM replaces it with an accumulator:
+    j_init = 0
+    each iteration: j += 3   (an add instead of a multiply)
+
+    return arr[3];  // returns 9
+
+  arr[3] = 3 * 3 = 9. Returns 9.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Induction Variable Optimization (unoptimized):
+  i = 0
+  Loop:
+    j = i * 3      (MUL instruction — expensive)
+    arr[i] = j
+    i++
+    if i < 10: repeat
+
+With Induction Variable Elimination (LLVM -O2):
+  i = 0
+  j = 0           (j starts at the initial value of i*3 = 0*3 = 0)
+  Loop:
+    arr[i] = j
+    i++
+    j += 3         (ADD instead of MUL — cheap!)
+    if i < 10: repeat
+
+  10 multiplications -> REPLACED by 10 additions (much cheaper).
+  If 'i' is now only used as the loop bound, it may be eliminated too,
+  keeping only 'j' as the loop variable.
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O2 -S -emit-llvm -o iv_elim.ll example_1_1.c
+
+Then open iv_elim.ll and observe:
+  - At -O2: look for the loop body. A 'mul' instruction for i*3 should
+    be REPLACED by an 'add' with a step of 3.
+  - The loop induction structure changes from multiplication to addition.
+
+Compare with:
+  clang -O0 -S -emit-llvm -o iv_elim_noopt.ll example_1_1.c
+  - Here you'll see: %j = mul i32 %i, 3  inside the loop body.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  arr[3] = 3 * 3 = 9
+  The program returns 9.
+
+Final array contents:
+  arr = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Induction Variable Elimination replaces expensive MUL in loops with ADD.
+  - Multiplications are typically 3-5x slower than additions on hardware.
+  - This optimization is especially useful in tight loops that run thousands
+    of times (e.g., array processing, graphics, signal processing).
+  - LLVM's "Scalar Evolution" (SCEV) analysis detects induction variables.
+  - Closely related to Strength Reduction (same concept, different scope).
+====================================================

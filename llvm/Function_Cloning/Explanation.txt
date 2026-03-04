@@ -1,0 +1,123 @@
+====================================================
+  LLVM OPTIMIZATION: Function Cloning
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Function_Cloning
+COMPILE COMMAND: clang -O3 -S -emit-llvm -o func_clone.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS FUNCTION CLONING?
+----------------------------------------------------
+Function Cloning is a compiler optimization where LLVM creates one or more
+SPECIALIZED COPIES (clones) of a function, each tailored for a specific
+set of constant arguments that are always the same at a particular call site.
+
+When a function is called with CONSTANT ARGUMENTS (like 0 or 1) at known
+call sites, LLVM can:
+  1. Create a specialized clone of the function with those constants
+     substituted directly into the function body.
+  2. Apply further optimizations (like dead branch elimination) within
+     the clone, since branches whose conditions are now constants can
+     be resolved at compile time.
+
+This avoids runtime branching and makes each call site ultra-efficient.
+It is closely related to FUNCTION SPECIALIZATION and INLINING.
+
+----------------------------------------------------
+THE CODE EXPLAINED
+----------------------------------------------------
+
+THE ORIGINAL FUNCTION:
+  int process(int value, int mode) {
+      if (mode == 0) {
+          return value * 2;
+      } else {
+          return value + 100;
+      }
+  }
+
+  This function has two behaviors based on 'mode':
+    - mode == 0: returns value * 2
+    - mode != 0: returns value + 100
+
+  At runtime (without optimization), each call to process() must:
+    1. Check the value of 'mode'
+    2. Decide which branch to take
+    3. Execute the appropriate calculation
+  This costs a branch (conditional jump) every time.
+
+THE CALL SITES:
+  int r1 = process(10, 0);   // mode is ALWAYS 0 here
+  int r2 = process(10, 1);   // mode is ALWAYS 1 here
+
+  Both call sites use CONSTANT arguments.
+  LLVM can see this at compile time.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+With Function Cloning (LLVM -O3):
+
+  LLVM creates TWO specialized clones:
+
+  Clone 1 (for mode=0):
+    int process_clone_mode0(int value) {
+        return value * 2;   // branch for mode==0 is the only code left
+    }
+    Result: process_clone_mode0(10) = 10 * 2 = 20
+
+  Clone 2 (for mode=1):
+    int process_clone_mode1(int value) {
+        return value + 100;  // branch for mode!=0 is the only code left
+    }
+    Result: process_clone_mode1(10) = 10 + 100 = 110
+
+  The "if (mode == 0)" BRANCH IS ELIMINATED in each clone
+  because mode is now a compile-time known constant.
+
+  The call sites become:
+    r1 = process_clone_mode0(10) = 20
+    r2 = process_clone_mode1(10) = 110
+
+  Further: at -O3, these small clones are likely INLINED too,
+  making the final code:
+    r1 = 20  (directly)
+    r2 = 110 (directly)
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O3 -S -emit-llvm -o func_clone.ll example_1_1.c
+
+Then open func_clone.ll and observe:
+  - At -O3: the function may be fully inlined and constants resolved.
+    r1 and r2 may simply appear as literals 20 and 110.
+  - Alternatively, you may see specialized versions of process() in the IR.
+
+Also try:
+  clang -O0 -S -emit-llvm -o func_clone_noopt.ll example_1_1.c
+  - Here: a full call to process() with branch check will be present.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  r1 = process(10, 0) = 10 * 2 = 20
+  r2 = process(10, 1) = 10 + 100 = 110
+  return r1 + r2 = 20 + 110 = 130
+  The program returns 130.
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Function Cloning removes runtime branching by creating specialized
+    versions of functions for known call-site argument values.
+  - Each clone is leaner — only the relevant code path remains.
+  - It trades a small increase in CODE SIZE (more clones) for a significant
+    SPEED GAIN (no branching at call sites).
+  - At -O3, LLVM aggressively applies this alongside inlining.
+  - Beneficial especially when a function is called many times with
+    the same constant argument values.
+====================================================

@@ -1,0 +1,113 @@
+====================================================
+  LLVM OPTIMIZATION: Dead Code Elimination (DCE)
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Dead_Code_Elimination
+COMPILE COMMAND: clang -O1 -S -emit-llvm -o dce.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS DEAD CODE ELIMINATION (DCE)?
+----------------------------------------------------
+Dead Code Elimination is a compiler optimization that identifies and
+REMOVES code that has NO EFFECT on the program's observable output.
+
+"Dead Code" is any code whose result is:
+  - NEVER READ after it is computed, OR
+  - NEVER REACHABLE during execution (unreachable code — separate concept).
+
+In this example, we focus on the first type:
+  A variable is computed and stored, but its value is NEVER USED again.
+  This is called a "dead definition" — the assignment is pointless,
+  so LLVM removes it entirely.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int a = 5;
+
+  'a' is assigned 5. It IS used later (in computing c), so it is LIVE (not dead).
+
+    int b = 20;      // b is computed but never used — dead code
+
+  'b' is assigned 20.
+  LOOK CAREFULLY: 'b' is NEVER READ or USED anywhere else in the function.
+  It is not part of any expression, not passed to any function, not returned.
+  Therefore: b = 20 is DEAD CODE.
+  LLVM detects this and completely REMOVES the assignment to b.
+
+    int c = a + 10;  // only c is used
+
+  c = 5 + 10 = 15
+  'c' IS used — it is returned. So 'c' is LIVE code.
+
+    return c;  // returns 15
+
+  Returns 15. This is the only observable output of the function.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Dead Code Elimination (unoptimized):
+  a = 5                  (LIVE)
+  b = 20                 (DEAD — but still computed at runtime)
+  c = a + 10 = 15        (LIVE)
+  return c               (LIVE)
+
+With Dead Code Elimination (LLVM -O1):
+  a = 5                  (LIVE — kept)
+  b = 20                 (DEAD — REMOVED entirely!)
+  c = a + 10 = 15        (LIVE — kept)
+  return 15              (LIVE — kept)
+
+The instruction "b = 20" doesn't appear in the optimized binary at all.
+(In fact, since a=5 is constant, c=15 is also folded, so the final IR is just: ret i32 15)
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O1 -S -emit-llvm -o dce.ll example_1_1.c
+
+Then open dce.ll and observe:
+  - The variable 'b' and its assignment (b = 20) will be COMPLETELY ABSENT.
+  - You will see only the logic for returning 15.
+  - At -O1, it likely collapses to: ret i32 15
+
+Compare with:
+  clang -O0 -S -emit-llvm -o dce_noopt.ll example_1_1.c
+  - Here b = 20 WILL appear (as an alloca + store), even though it's never used.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  a = 5
+  b = 20  (dead — eliminated, has no effect on output)
+  c = a + 10 = 15
+  The program returns 15.
+
+----------------------------------------------------
+HOW LLVM DETERMINES "DEADNESS"
+----------------------------------------------------
+LLVM uses a technique called "Liveness Analysis":
+  - It works BACKWARDS from the return/output of the function.
+  - A variable is LIVE if it contributes (directly or indirectly) to the output.
+  - A variable is DEAD if it never contributes to the output.
+
+In this example:
+  - return c  -> c is LIVE
+  - c = a + 10 -> a is LIVE
+  - b = 20 -> b is never referenced after this -> b is DEAD
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Dead Code Elimination removes useless computations.
+  - Makes binaries smaller and execution faster.
+  - Works well as a follow-up to Copy Propagation and Constant Propagation
+    (those optimizations often make variables go unused, making them dead).
+  - LLVM performs DCE automatically at -O1 and above.
+  - It is safe because removing dead code CANNOT change observable behavior.
+====================================================

@@ -1,0 +1,123 @@
+====================================================
+  LLVM OPTIMIZATION: Constant Propagation
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Constant_Propagation
+COMPILE COMMAND: clang -O1 -S -emit-llvm -o const_prop.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS CONSTANT PROPAGATION?
+----------------------------------------------------
+Constant Propagation is a compiler optimization where the compiler
+TRACKS variables that are assigned a CONSTANT VALUE and SUBSTITUTES
+(propagates) that constant value directly wherever the variable is used.
+
+Instead of reading the variable's value from memory at runtime,
+the compiler replaces all uses of the variable with the actual
+constant it holds — since the variable's value is KNOWN at compile time.
+
+Constant Propagation is often combined with Constant Folding:
+  - First, constants are propagated into expressions.
+  - Then, those expressions (now all-constant) are folded into final values.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int x = 10;           // x is a known constant
+
+  x is initialized to 10. Since x is never reassigned, LLVM knows
+  x = 10 ALWAYS throughout the function.
+
+    int y = x + 5;        // propagated: y = 10 + 5 = 15
+
+  LLVM sees that x = 10 (a constant).
+  It PROPAGATES x's value and SUBSTITUTES 10 for x:
+    y = 10 + 5
+  Then FOLDS the constant expression:
+    y = 15
+  No runtime addition needed.
+
+    int z = y * 2;        // propagated: z = 15 * 2 = 30
+
+  LLVM sees that y = 15 (propagated constant from above).
+  It PROPAGATES y's value and substitutes 15 for y:
+    z = 15 * 2
+  Then FOLDS:
+    z = 30
+  No runtime multiplication needed.
+
+    return z;
+
+  LLVM knows z = 30 at compile time.
+  The function simply returns 30.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Constant Propagation (unoptimized):
+  At runtime:
+    Load x from memory -> 10
+    ADD x, 5 -> y = 15
+    Store y
+    Load y from memory -> 15
+    MUL y, 2 -> z = 30
+    Store z
+    Load z
+    Return z
+
+With Constant Propagation + Folding (LLVM -O1):
+  All values are determined at COMPILE TIME:
+    x = 10  (known)
+    y = 15  (propagated and folded)
+    z = 30  (propagated and folded)
+  Generated IR effectively becomes:
+    ret i32 30
+  (Just a single return instruction — no memory loads, no arithmetic!)
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O1 -S -emit-llvm -o const_prop.ll example_1_1.c
+
+Then open const_prop.ll and observe:
+  - The IR will show: ret i32 30
+  - No add or mul instructions will be present.
+  - All variables have been eliminated via propagation + folding.
+
+Compare with:
+  clang -O0 -S -emit-llvm -o const_prop_noopt.ll example_1_1.c
+  - Here you'll see load, add, mul, store instructions for x, y, z.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  x = 10
+  y = 10 + 5 = 15
+  z = 15 * 2 = 30
+  The program returns 30.
+
+----------------------------------------------------
+DIFFERENCE: Constant Folding vs Constant Propagation
+----------------------------------------------------
+  Constant Folding:
+    Works on EXPRESSIONS made only of LITERAL constants.
+    Example: int a = 3 + 4;  --> folds to 7
+
+  Constant Propagation:
+    Works on VARIABLES that are known to hold a constant value.
+    Example: int x = 10; int y = x + 5;  --> propagates x=10, then folds.
+
+  They work together: Propagation feeds constants into Folding.
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Constant Propagation removes the need to store/load constant variables.
+  - Reduces memory access and arithmetic instructions at runtime.
+  - LLVM tracks the "constant-ness" of every variable using data-flow analysis.
+  - Very effective for code with many fixed configuration values.
+====================================================

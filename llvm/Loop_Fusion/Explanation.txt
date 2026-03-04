@@ -1,0 +1,122 @@
+====================================================
+  LLVM OPTIMIZATION: Loop Fusion
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Loop_Fusion
+COMPILE COMMAND: clang -O3 -S -emit-llvm -o loop_fusion.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS LOOP FUSION?
+----------------------------------------------------
+Loop Fusion (also called "Loop Jamming") is a compiler optimization where
+TWO OR MORE ADJACENT LOOPS that iterate over the SAME RANGE are MERGED
+into a SINGLE LOOP.
+
+This improves performance because:
+  1. LOOP OVERHEAD REDUCTION: Each loop has setup/teardown overhead
+     (initializing counter, comparing, branching). One loop = less overhead.
+  2. CACHE EFFICIENCY: When two loops access the SAME data, merging them
+     means the data is in the CPU cache when the second operation happens,
+     reducing cache misses.
+  3. BETTER INSTRUCTION-LEVEL PARALLELISM: The CPU can pipeline operations
+     from both original loops together.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int a[5], b[5];
+
+  Two integer arrays, each of size 5.
+
+  LOOP 1:
+    for (int i = 0; i < 5; i++) {
+        a[i] = i * 2;        // fills a: [0, 2, 4, 6, 8]
+    }
+
+  Iterates i from 0 to 4.
+  Result:
+    a[0]=0, a[1]=2, a[2]=4, a[3]=6, a[4]=8
+
+  LOOP 2:
+    for (int i = 0; i < 5; i++) {
+        b[i] = a[i] + 1;     // fills b using a: [1, 3, 5, 7, 9]
+    }
+
+  Iterates i from 0 to 4 (SAME range as loop 1).
+  Uses the values from 'a' to compute 'b'.
+  Result:
+    b[0]=1, b[1]=3, b[2]=5, b[3]=7, b[4]=9
+
+  Both loops have the SAME iteration range (0 to 4).
+  LLVM can FUSE them into ONE loop:
+
+  FUSED LOOP (after optimization):
+    for (int i = 0; i < 5; i++) {
+        a[i] = i * 2;
+        b[i] = a[i] + 1;
+    }
+
+  Now both operations happen in the SAME iteration pass.
+
+    return b[2];  // returns 5
+
+  b[2] = a[2] + 1 = 4 + 1 = 5. Returns 5.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+Without Loop Fusion (unoptimized):
+  Loop 1: i=0...4  ->  set a[0..4]   (5 iterations, loop overhead x2)
+  Loop 2: i=0...4  ->  set b[0..4]   (5 more iterations)
+  Total: 10 iterations, 2 loop setup/teardown cycles.
+  Cache: Loop 2 re-accesses a[] which might have been evicted from cache.
+
+With Loop Fusion (LLVM -O3):
+  One loop: i=0...4  ->  set a[i] AND b[i] in the same iteration
+  Total: 5 iterations, 1 loop setup/teardown cycle.
+  Cache: a[i] is freshly computed, immediately used for b[i] — optimal locality!
+
+----------------------------------------------------
+CONDITIONS FOR LOOP FUSION TO BE SAFE
+----------------------------------------------------
+Loops can be fused ONLY IF:
+  1. They iterate over the SAME range (same start, end, step).
+  2. There are NO data dependencies that would cause incorrect results
+     when merged.
+     - In this example: Loop 2 reads a[i] which Loop 1 writes. Since we write
+       a[i] IN THE SAME ITERATION before reading it, the dependency is safe.
+  3. No side effects that would be reordered incorrectly.
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O3 -S -emit-llvm -o loop_fusion.ll example_1_1.c
+
+Then open loop_fusion.ll and observe:
+  - At -O3: look for a single loop body containing BOTH the a[i] and b[i] writes.
+  - The loop header (branch, counter increment) should appear ONCE, not twice.
+
+Compare with:
+  clang -O0 -S -emit-llvm -o loop_fusion_noopt.ll example_1_1.c
+  - Here you'll see TWO separate loop structures.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  a = [0, 2, 4, 6, 8]
+  b = [1, 3, 5, 7, 9]
+  return b[2] = 5
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - Loop Fusion reduces loop overhead (setup, comparison, branching).
+  - Improves CPU cache performance (data locality).
+  - Reduces total iteration count.
+  - LLVM applies this at -O3 when safe (no dependency violations).
+  - Very useful for scientific computing and array processing workflows.
+====================================================

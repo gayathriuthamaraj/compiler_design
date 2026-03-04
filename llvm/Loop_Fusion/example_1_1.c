@@ -2,8 +2,6 @@
 // LLVM merges two adjacent loops with the same range into one loop
 // Compile: clang -O3 -S -emit-llvm -o loop_fusion.ll example_1_1.c
 
-#include <stdio.h>
-
 int main() {
     int a[5], b[5];
 
@@ -16,6 +14,5 @@ int main() {
         b[i] = a[i] + 1;     // loop 2 (fused with loop 1)
     }
 
-    printf("a[2]=%d, b[2]=%d\n", a[2], b[2]);  // 4, 5
-    return 0;
+    return b[2];  // returns 5  (a[2]=4, b[2]=4+1=5)
 }

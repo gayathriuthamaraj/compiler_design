@@ -2,8 +2,6 @@
 // LLVM eliminates redundant induction variables derived from the loop counter
 // Compile: clang -O2 -S -emit-llvm -o iv_elim.ll example_1_1.c
 
-#include <stdio.h>
-
 int main() {
     int arr[10];
     int n = 10;
@@ -15,6 +13,5 @@ int main() {
         arr[i] = j;
     }
 
-    printf("arr[3] = %d\n", arr[3]);  // prints 9
-    return 0;
+    return arr[3];  // returns 9
 }

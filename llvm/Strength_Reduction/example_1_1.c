@@ -2,8 +2,6 @@
 // LLVM replaces expensive operations with cheaper equivalent operations
 // Compile: clang -O2 -S -emit-llvm -o strength_red.ll example_1_1.c
 
-#include <stdio.h>
-
 int main() {
     int x = 9;
 
@@ -15,6 +13,5 @@ int main() {
     // x * 4  --> x << 2
     int b = x * 4;
 
-    printf("a = %d, b = %d\n", a, b);  // 72, 36
-    return 0;
+    return a + b;  // 72 + 36 = 108
 }

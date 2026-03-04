@@ -1,0 +1,119 @@
+====================================================
+  LLVM OPTIMIZATION: Loop Invariant Code Motion (LICM)
+====================================================
+
+FILE: example_1_1.c
+FOLDER: Loop_Invariant_Detection_and_Code_Motion
+COMPILE COMMAND: clang -O2 -S -emit-llvm -o licm.ll example_1_1.c
+
+----------------------------------------------------
+WHAT IS LOOP INVARIANT CODE MOTION (LICM)?
+----------------------------------------------------
+Loop Invariant Code Motion is a compiler optimization that:
+  1. DETECTS computations inside a loop whose result does NOT CHANGE
+     across any iteration (they are "loop invariant").
+  2. MOVES ("hoists") those computations OUT of the loop body,
+     so they are computed ONCE before the loop, instead of
+     REDUNDANTLY on every iteration.
+
+A computation is "loop invariant" if ALL its operands:
+  - Are constants, OR
+  - Are DEFINED OUTSIDE the loop and not modified inside the loop.
+
+----------------------------------------------------
+THE CODE EXPLAINED (LINE BY LINE)
+----------------------------------------------------
+
+    int arr[100];
+    int factor = 7;
+    int scale  = 3;
+
+  'factor' = 7 and 'scale' = 3 are defined OUTSIDE the loop.
+  Neither is ever changed inside the loop.
+
+    for (int i = 0; i < 100; i++) {
+        arr[i] = i + factor * scale;   // factor * scale hoisted out
+    }
+
+  INSIDE THE LOOP: "factor * scale" is computed EVERY ITERATION.
+  But think about it — does "factor * scale" EVER CHANGE across iterations?
+    - factor = 7 (never changes inside the loop)
+    - scale  = 3 (never changes inside the loop)
+  Therefore: factor * scale = 7 * 3 = 21 EVERY SINGLE TIME.
+  Computing it 100 times is WASTEFUL.
+
+  This expression is LOOP INVARIANT.
+
+  LLVM detects this and HOISTS it out of the loop:
+    Before the loop: int inv = factor * scale;  // computed ONCE = 21
+    Inside the loop: arr[i] = i + inv;          // uses pre-computed value
+
+    return arr[10];  // returns 10 + 21 = 31
+
+  arr[10] = 10 + 21 = 31. Returns 31.
+
+----------------------------------------------------
+WHAT LLVM DOES INTERNALLY (THE OPTIMIZATION)
+----------------------------------------------------
+
+WITHOUT LICM (unoptimized — 100 multiplications):
+  for i = 0 to 99:
+    t = factor * scale   (MUL every iteration! — 100 multiplications)
+    arr[i] = i + t
+
+WITH LICM (optimized — 1 multiplication):
+  inv = factor * scale    (MUL once, BEFORE the loop — 1 multiplication)
+  for i = 0 to 99:
+    arr[i] = i + inv      (only ADD inside the loop — 100 additions, no MUL)
+
+Savings: 99 multiplications eliminated!
+(Multiplications take 3-5x more clock cycles than additions)
+
+----------------------------------------------------
+HOW TO SEE THE OPTIMIZATION IN THE LLVM IR
+----------------------------------------------------
+Run:
+  clang -O2 -S -emit-llvm -o licm.ll example_1_1.c
+
+Then open licm.ll and observe:
+  - Before the loop (in the "entry" basic block): look for the mul instruction
+    computing factor * scale = 21. It should appear OUTSIDE the loop.
+  - Inside the loop basic block: only an ADD (i + 21) should remain.
+    No mul instruction inside the loop.
+
+Compare with:
+  clang -O0 -S -emit-llvm -o licm_noopt.ll example_1_1.c
+  - Here: the mul instruction (factor * scale) will appear INSIDE the loop body,
+    executing 100 times.
+
+----------------------------------------------------
+EXPECTED RETURN VALUE
+----------------------------------------------------
+  factor * scale = 7 * 3 = 21  (hoisted — computed ONCE)
+  arr[10] = 10 + 21 = 31
+  The program returns 31.
+
+Full array: arr[i] = i + 21
+  arr[0]=21, arr[1]=22, ..., arr[10]=31, ..., arr[99]=120
+
+----------------------------------------------------
+LICM DETECTION — HOW DOES LLVM FIND INVARIANTS?
+----------------------------------------------------
+LLVM uses a pass called "Loop Invariant Code Motion" (LICM pass):
+  1. Builds a "Loop Info" structure describing all loops and their boundaries.
+  2. For each instruction inside the loop, checks if ALL its operands are
+     defined OUTSIDE the loop (or are constants).
+  3. If yes → the instruction is LOOP INVARIANT → it is HOISTED to the
+     "loop preheader" block (the block that runs just before the loop starts).
+
+This is completely automatic and safe. It's one of LLVM's most impactful passes.
+
+----------------------------------------------------
+KEY TAKEAWAY
+----------------------------------------------------
+  - LICM removes repeated computation of constant expressions inside loops.
+  - Single biggest win when the loop runs many iterations.
+  - Reduces multiplications/divisions inside loops to once-before-loop.
+  - Works for any expression whose inputs don't change across iterations.
+  - Applied at -O2 and above in LLVM.
+====================================================
