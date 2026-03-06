@@ -19,7 +19,7 @@ const TOPICS = [
       dir: 'llvm/Common_Subexpression_Elimination',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -37,7 +37,7 @@ const TOPICS = [
       dir: 'llvm/Constant_Folding',
       src: null,           // no source in LLVM folder; GCC source is shared
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -55,7 +55,7 @@ const TOPICS = [
       dir: 'llvm/Constant_Propagation',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -73,7 +73,7 @@ const TOPICS = [
       dir: 'llvm/Copy_Propagation',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -91,7 +91,7 @@ const TOPICS = [
       dir: 'llvm/Dead_Code_Elimination',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -109,7 +109,7 @@ const TOPICS = [
       dir: 'llvm/Function_Cloning',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -127,7 +127,7 @@ const TOPICS = [
       dir: 'llvm/Function_Inlining',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -145,7 +145,7 @@ const TOPICS = [
       dir: 'llvm/Induction_Variable_Elimination',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -163,7 +163,7 @@ const TOPICS = [
       dir: 'llvm/Loop_Fusion',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -181,7 +181,7 @@ const TOPICS = [
       dir: 'llvm/Loop_Invariant_Detection_and_Code_Motion',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -199,7 +199,7 @@ const TOPICS = [
       dir: 'llvm/Loop_Peeling',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: null,   // no LLVM explanation for Loop Peeling
+      explanation: 'explanation.md',
     },
   },
   {
@@ -217,7 +217,7 @@ const TOPICS = [
       dir: 'llvm/Strength_Reduction',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -235,7 +235,7 @@ const TOPICS = [
       dir: 'llvm/Strength_Reduction_in_Loops',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
   {
@@ -253,7 +253,7 @@ const TOPICS = [
       dir: 'llvm/Unreachable_Code_Elimination',
       src: 'example_1_1.c',
       ir: { O0: 'example_O0.ll', O1: 'example_O1.ll', O2: 'example_O2.ll', O3: 'example_O3.ll' },
-      explanation: 'Explanation.txt',
+      explanation: 'explanation.md',
     },
   },
 ];
@@ -338,15 +338,10 @@ function parseGccExplanation(md) {
   return { ...sections, intro };
 }
 
-/* ── Parse plain-text LLVM Explanation.txt ───────── */
+/* ── Parse LLVM explanation.md → per-level sections (same format as GCC) ── */
 function parseLlvmExplanation(txt) {
-  if (!txt) return '';
-  // Convert plain text to HTML: bold section headers, preserve line breaks
-  return txt
-    .replace(/={30,}/g, '<hr style="border-color:var(--border-dim)">')
-    .replace(/-{30,}/g,  '<hr style="border-color:var(--border-dim);opacity:0.5">')
-    .replace(/^([A-Z][A-Z\s\/():-]{4,}):?\s*$/gm, '<strong style="color:var(--text)">$1</strong>')
-    .replace(/\n/g, '<br>');
+  // Reuse the same section parser as GCC — LLVM .md files use identical ### -O0 headers
+  return parseGccExplanation(txt);
 }
 
 /* ── Build key differences table ─────────────────── */
@@ -365,11 +360,12 @@ function buildDiffTable(gccSections, llvmFullText) {
     O3: extractFirstBullets(gccSections.O3, 3) || 'Aggressive optimizations including vectorization.',
   };
 
+  const llvmSec = parseGccExplanation(llvmFullText);
   const llvmSummary = {
-    O0: extractLLVMLevel(llvmFullText, 'O0') || 'No optimizations; full debug info preserved.',
-    O1: extractLLVMLevel(llvmFullText, 'O1') || 'Simple optimizations; mem2reg applied.',
-    O2: extractLLVMLevel(llvmFullText, 'O2') || 'CSE, GVN, LICM applied at IR level.',
-    O3: extractLLVMLevel(llvmFullText, 'O3') || 'Aggressive inlining, unrolling, auto-vectorization.',
+    O0: extractFirstBullets(llvmSec.O0, 3) || 'No optimizations; full debug info preserved.',
+    O1: extractFirstBullets(llvmSec.O1, 3) || 'Simple optimizations; mem2reg applied.',
+    O2: extractFirstBullets(llvmSec.O2, 3) || 'CSE, GVN, LICM applied at IR level.',
+    O3: extractFirstBullets(llvmSec.O3, 3) || 'Aggressive inlining, unrolling, auto-vectorization.',
   };
 
   let html = `
@@ -609,17 +605,18 @@ function renderExplanation(tab) {
       `;
     }
   } else if (tab === 'llvm') {
-    // Show general LLVM explanation
-    const txt = state.llvmExplanation;
-    if (!txt) {
+    // Show per-level LLVM explanation (same markdown format as GCC)
+    const llvmSec = parseLlvmExplanation(state.llvmExplanation);
+    const section = llvmSec[level] || llvmSec.intro || '';
+    if (!section) {
       expContent.innerHTML = '<em style="color:var(--text-dim)">No LLVM explanation available.</em>';
     } else {
       expContent.innerHTML = `
         <div class="notice">
           <span class="notice-icon">◈</span>
-          <span>LLVM/Clang explanation – ${state.currentTopic?.name}</span>
+          <span>LLVM/Clang explanation for optimization level <strong>${level}</strong> – ${state.currentTopic?.name}</span>
         </div>
-        <div style="font-size:13px;line-height:1.8;white-space:pre-wrap">${parseLlvmExplanation(txt)}</div>
+        ${typeof marked !== 'undefined' ? marked.parse(section) : `<pre>${escHtml(section)}</pre>`}
       `;
     }
   } else if (tab === 'diff') {
